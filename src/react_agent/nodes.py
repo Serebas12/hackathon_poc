@@ -8,7 +8,7 @@ from dotenv import load_dotenv
 from typing import Annotated
 import os
 from react_agent.state import CustomState
-from react_agent.tools import web_search
+from react_agent.tools import web_search, cedula_tool, registraduria_tool, fecha_defuncion_tool, transfer_to_cedula, transfer_to_registraduria, transfer_to_defuncion
 
 load_dotenv()  # Esto carga las variables del archivo .env
 
@@ -17,69 +17,44 @@ project_id = os.getenv("PROJECT_ID")
 # Carga del modelo de GCP
 llm_gcp=VertexAILLM(project=project_id).get_model()
 
-#Creación de las tools 
-
-def create_handoff_tool(agent_name: str):
-    @tool(f"transfer_to_{agent_name}", description=f"Transferir al agente {agent_name}")
-    def handoff(
-        state: Annotated[CustomState, InjectedState],
-        tool_call_id: Annotated[str, InjectedToolCallId]
-    ) -> Command:
-        # Creamos un mensaje de transferencia
-        tool_msg = {
-            "role": "tool",
-            "content": f"Transferido a {agent_name}",
-            "name": f"transfer_to_{agent_name}",
-            "tool_call_id": tool_call_id,
-        }
-        return Command(
-            goto=agent_name,
-            update={"messages": state["messages"] + [tool_msg]},
-            graph=Command.PARENT
-        )
-    return handoff
-
-transfer_to_cedula = create_handoff_tool("cedula_agent")
-transfer_to_registraduria = create_handoff_tool("registraduria_agent")
-transfer_to_defuncion = create_handoff_tool("defuncion_agent")
-
 #creación de los agentes react 
 
 cedula_agent = create_react_agent(
-    model=llm_gcp,
-    tools=[web_search],
+    model="azure_openai:gpt-4.1",
+    tools=[cedula_tool],
     prompt=(
-        "You are a research agent.\n\n"
+        "eres un experto que obtiene el número de documento de una persona.\n\n"
         "INSTRUCTIONS:\n"
-        "- Assist ONLY with research-related tasks, DO NOT do any math\n"
-        "- After you're done with your tasks, respond to the supervisor directly\n"
-        "- Respond ONLY with the results of your work, do NOT include ANY other text."
+        "- tu tarea es obtener el número de documento de la persona\n"
+        "- no lo hagas tú mismo, usa la herramienta cedula_tool\n"
+        "- si no tienes el número de documento, no lo hagas tú mismo, usa la herramienta cedula_tool\n"
+        "- no pidas información adicional, solo llama la herramienta cedula_tool\n"
     ),
     name="cedula_agent",
 )
 
 registraduria_agent = create_react_agent(
-    model=llm_gcp,
-    tools=[web_search],
+    model="azure_openai:gpt-4.1",
+    tools=[registraduria_tool],
     prompt=(
-        "You are a research agent.\n\n"
+        "eres un experto que obtiene el estado de la persona en la registraduría.\n\n"
         "INSTRUCTIONS:\n"
-        "- Assist ONLY with research-related tasks, DO NOT do any math\n"
-        "- After you're done with your tasks, respond to the supervisor directly\n"
-        "- Respond ONLY with the results of your work, do NOT include ANY other text."
+        "- tu tarea es obtener el estado de la persona en la registraduría\n"
+        "- no lo hagas tú mismo, usa la herramienta registraduria_tool\n"
+        "- si no tienes el estado de la persona en la registraduría, no lo hagas tú mismo, usa la herramienta registraduria_tool\n"
     ),
     name="registraduria_agent",
 )
 
 defuncion_agent = create_react_agent(
-    model=llm_gcp,
-    tools=[web_search],
+    model="azure_openai:gpt-4.1",
+    tools=[fecha_defuncion_tool],
     prompt=(
-        "You are a research agent.\n\n"
+        "eres un experto que obtiene la fecha de defunción de una persona.\n\n"
         "INSTRUCTIONS:\n"
-        "- Assist ONLY with research-related tasks, DO NOT do any math\n"
-        "- After you're done with your tasks, respond to the supervisor directly\n"
-        "- Respond ONLY with the results of your work, do NOT include ANY other text."
+        "- tu tarea es obtener la fecha de defunción de la persona\n"
+        "- no lo hagas tú mismo, usa la herramienta fecha_defuncion_tool\n"
+        "- si no tienes la fecha de defunción, no lo hagas tú mismo, usa la herramienta fecha_defuncion_tool\n"
     ),
     name="defuncion_agent",
 )
@@ -87,13 +62,15 @@ defuncion_agent = create_react_agent(
 # Creación del supervisor
 
 supervisor_agent = create_react_agent(
-    model=llm_gcp,
+    model="azure_openai:gpt-4.1",
     tools=[transfer_to_cedula, transfer_to_registraduria, transfer_to_defuncion],
     prompt=(
-        "You are a supervisor managing two agents:\n"
-        "- Assign research to research_agent\n"
-        "- Assign math to math_agent\n"
-        "Only one agent at a time. No hagas trabajo tú mismo."
+        "You are a supervisor managing three agents:\n"
+        "- obtener  el número de documento de un usuario a cedula_agent\n"
+        "- verificar el estado de la persona en la registraduría a registraduria_agent\n"
+        "- obtener la fecha de defunción a defuncion_agent\n"
+        "siempre tienes que obtener el número de documento de un usuario, verificar el estado de la persona en la registraduría y obtener la fecha de defunción, en ese orden sin excepciones"
+        "para obtener el número de documento de un usuario, usa la herramienta cedula_tool y no pidas información adicional, no es requerido ningun otro dato"
     ),
     name="supervisor"
 )

@@ -8,14 +8,11 @@ from typing import Sequence
 from langchain_core.messages import AnyMessage
 from langgraph.graph import add_messages
 from langgraph.managed import IsLastStep
-from typing_extensions import Annotated
+from typing_extensions import Annotated, NotRequired
 
 from typing import List, TypedDict
 from langchain_core.messages import BaseMessage
 
 class CustomState(TypedDict):
-    messages: Sequence[AnyMessage]  
-    cedula: str
-    estado_registraduria: str
-    fecha_defuncion: str
+    messages: Annotated[List[BaseMessage], add_messages]
 
