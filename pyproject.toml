@@ -16,6 +16,9 @@ dependencies = [
     "langchain-fireworks>=0.1.7",
     "python-dotenv>=1.0.1",
     "langchain-tavily>=0.1",
+    "langgraph-cli[inmem] (>=0.3.3,<0.4.0)",
+    "google-auth (>=2.40.3,<3.0.0)",
+    "langchain-google-vertexai (>=2.0.25,<3.0.0)",
 ]
 
 

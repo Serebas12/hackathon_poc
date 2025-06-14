@@ -26,3 +26,15 @@ async def search(query: str) -> Optional[dict[str, Any]]:
 
 
 TOOLS: List[Callable[..., Any]] = [search]
+async def web_search(query: str) -> str:
+    """
+    Una función de búsqueda simple que retorna un string fijo.
+    
+    Args:
+        query: El texto de búsqueda
+        
+    Returns:
+        str: Retorna siempre "probando"
+    """
+    return "probando"
+

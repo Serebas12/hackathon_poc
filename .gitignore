@@ -163,3 +163,40 @@ cython_debug/
 #.idea/
 
 .langgraph_api
+
+
+
+# Archivos de credenciales adicionales
+credentials/
+creds/
+secrets/
+config/credentials*
+*credentials*
+*secrets*
+*.key
+*.pem
+*.p12
+*.pfx
+auth.json
+config.json
+auth_config.py
+secret_config.py
+api_keys.py
+tokens.txt
+*.token
+
+# AWS credentials
+.aws/
+aws-credentials*
+
+# Azure credentials
+.azure/
+
+# OpenAI/API Keys
+openai_api_key*
+api_key*
+
+# Base de datos locales con datos sensibles
+*.db
+*.sqlite
+*.sqlite3 
