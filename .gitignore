@@ -200,3 +200,6 @@ api_key*
 *.db
 *.sqlite
 *.sqlite3 
+
+#documentos de pruebas
+src/doc_pruebas/

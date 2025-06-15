@@ -7,7 +7,7 @@ from langgraph.types import Command
 from dotenv import load_dotenv
 from typing import Annotated
 import os
-from react_agent.state import CustomState
+from react_agent.state import State
 from react_agent.tools import web_search, cedula_tool, registraduria_tool, fecha_defuncion_tool, transfer_to_cedula, transfer_to_registraduria, transfer_to_defuncion
 
 load_dotenv()  # Esto carga las variables del archivo .env
@@ -65,12 +65,21 @@ supervisor_agent = create_react_agent(
     model="azure_openai:gpt-4.1",
     tools=[transfer_to_cedula, transfer_to_registraduria, transfer_to_defuncion],
     prompt=(
-        "You are a supervisor managing three agents:\n"
-        "- obtener  el número de documento de un usuario a cedula_agent\n"
-        "- verificar el estado de la persona en la registraduría a registraduria_agent\n"
-        "- obtener la fecha de defunción a defuncion_agent\n"
-        "siempre tienes que obtener el número de documento de un usuario, verificar el estado de la persona en la registraduría y obtener la fecha de defunción, en ese orden sin excepciones"
-        "para obtener el número de documento de un usuario, usa la herramienta cedula_tool y no pidas información adicional, no es requerido ningun otro dato"
+        """Eres un supervisor que coordina tres agentes especializados. Tu tarea es siempre ejecutar, en este orden y sin excepciones, las siguientes acciones:
+
+        1. Obtener el número de documento del usuario usando la herramienta `cedula_tool`.
+        2. Verificar el estado de la persona en la registraduría usando `registraduria_agent`.
+        3. Obtener la fecha de defunción usando `defuncion_agent`.
+
+        ⚠️ Instrucciones clave (obligatorias):
+        - Siempre debes iniciar ejecutando la herramienta `cedula_tool`. No preguntes, no confirmes, no hagas razonamientos antes de usarla.
+        - No pidas ninguna información adicional al usuario. Toda la información requerida se obtiene únicamente con las herramientas.
+        - Está prohibido iniciar una conversación o solicitar datos al usuario en este paso. Usa directamente `cedula_tool`.
+
+        🔁 Repite siempre este flujo, sin desviarte ni invertir el orden de ejecución.
+
+        Tu rol no es dialogar ni decidir: es coordinar a los agentes y ejecutar cada paso secuencialmente.
+        """
     ),
     name="supervisor"
 )

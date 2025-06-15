@@ -11,30 +11,31 @@ from langgraph.graph import StateGraph
 from langgraph.prebuilt import ToolNode
 
 from react_agent.configuration import Configuration
-from react_agent.state import  CustomState
+from react_agent.state import  State, InputState
 from react_agent.utils import load_chat_model
 from react_agent.nodes import supervisor_agent, cedula_agent, registraduria_agent, defuncion_agent
 
 
-builder = StateGraph(CustomState)
+builder = StateGraph(State, input=InputState)
 
+
+# Define the two nodes we will cycle between
 builder.add_node("supervisor", supervisor_agent)
 builder.add_node("cedula_agent", cedula_agent)
 builder.add_node("registraduria_agent", registraduria_agent)
 builder.add_node("defuncion_agent", defuncion_agent)
 
-builder.add_edge("__start__",  "supervisor")
-
-builder.add_edge("cedula_agent", "supervisor")
-builder.add_edge("registraduria_agent", "supervisor")
-builder.add_edge("defuncion_agent", "supervisor")
-
-def supervisor_routing(state: CustomState) -> str:
+def supervisor_routing(state: State) -> str:
     """Determina a qué agente transferir según el tool_call del supervisor."""
-    if "messages" not in state or not state["messages"]:
+    # Protección: verificar que existan mensajes
+    print(f"[DEBUG] Estado recibido en supervisor_routing: {state}")
+    print(f"[DEBUG] Doc1 en supervisor_routing: '{getattr(state, 'Doc1', None)}'")
+
+
+    if not state.messages:
         return "__end__"
-    
-    last = state["messages"][-1]
+
+    last = state.messages[-1]
 
     if not hasattr(last, "tool_calls") or not last.tool_calls:
         return "__end__"
@@ -51,7 +52,12 @@ def supervisor_routing(state: CustomState) -> str:
     else:
         return "__end__"
 
+# Set up the edges
+builder.add_edge("__start__",  "supervisor")
 builder.add_conditional_edges("supervisor", supervisor_routing)
+builder.add_edge("cedula_agent", "supervisor")
+builder.add_edge("registraduria_agent", "supervisor")
+builder.add_edge("defuncion_agent", "supervisor")
 
-# Compile the builder into an executable graph
-graph = builder.compile(name="ReAct Agent")
+# Compile the graph
+graph = builder.compile()

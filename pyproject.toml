@@ -19,6 +19,8 @@ dependencies = [
     "langgraph-cli[inmem] (>=0.3.3,<0.4.0)",
     "google-auth (>=2.40.3,<3.0.0)",
     "langchain-google-vertexai (>=2.0.25,<3.0.0)",
+    "pymupdf (>=1.26.1,<2.0.0)",
+    "dataclasses-json (>=0.6.7,<0.7.0)",
 ]
 
 
