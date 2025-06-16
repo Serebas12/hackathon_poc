@@ -7,7 +7,7 @@ from langgraph.types import Command
 from dotenv import load_dotenv
 from typing import Annotated
 import os
-from react_agent.state import State
+from react_agent.state import State, ReactAgentState
 from react_agent.tools import  cedula_tool, registraduria_tool, fecha_defuncion_tool, transfer_to_cedula, transfer_to_registraduria, transfer_to_defuncion, saldo_tool, transfer_to_saldo
 
 load_dotenv()  # Esto carga las variables del archivo .env
@@ -22,6 +22,7 @@ llm_gcp=VertexAILLM(project=project_id).get_model()
 cedula_agent = create_react_agent(
     model="azure_openai:gpt-4.1",
     tools=[cedula_tool],
+    state_schema=ReactAgentState,  # Usar esquema compatible con react agent
     prompt=(
         "eres un experto que obtiene el número de documento de una persona.\n\n"
         "INSTRUCTIONS:\n"
@@ -36,6 +37,7 @@ cedula_agent = create_react_agent(
 registraduria_agent = create_react_agent(
     model="azure_openai:gpt-4.1",
     tools=[registraduria_tool],
+    state_schema=ReactAgentState,  # Usar esquema compatible con react agent
     prompt=(
         "eres un experto que obtiene el estado de la persona en la registraduría.\n\n"
         "INSTRUCTIONS:\n"
@@ -49,6 +51,7 @@ registraduria_agent = create_react_agent(
 defuncion_agent = create_react_agent(
     model="azure_openai:gpt-4.1",
     tools=[fecha_defuncion_tool],
+    state_schema=ReactAgentState,  # Usar esquema compatible con react agent
     prompt=(
         "eres un experto que obtiene la fecha de defunción de una persona.\n\n"
         "INSTRUCTIONS:\n"
@@ -62,6 +65,7 @@ defuncion_agent = create_react_agent(
 saldo_agent = create_react_agent(
     model="azure_openai:gpt-4.1",
     tools=[saldo_tool],
+    state_schema=ReactAgentState,  # Usar esquema compatible con react agent
     prompt=(
     """
     Tu objetivo es determinar si una persona aplica o no a **Póliza Express** con base en los datos obtenidos mediante la herramienta `saldo_tool`.  
@@ -100,6 +104,7 @@ saldo_agent = create_react_agent(
 
     **En todos los casos se debe cumplir adicionalmente lo siguiente:**
     - La **fecha de siniestro debe estar dentro de la vigencia del crédito** (inicio ≤ siniestro ≤ fin)
+    - el estado de la persona en la registraduría debe ser fallecido.
 
     ### Instrucciones:
     1. Revisa el historial de mensajes para encontrar el número de cédula extraído previamente.
@@ -122,6 +127,7 @@ saldo_agent = create_react_agent(
 supervisor_agent = create_react_agent(
     model="azure_openai:gpt-4.1",
     tools=[transfer_to_cedula, transfer_to_registraduria, transfer_to_defuncion, transfer_to_saldo],
+    state_schema=ReactAgentState,  # Usar esquema compatible con react agent
     prompt=(
         """Eres un supervisor que coordina tres agentes especializados. Tu tarea es siempre ejecutar, en este orden y sin excepciones, las siguientes acciones:
 
@@ -143,7 +149,7 @@ supervisor_agent = create_react_agent(
             - numero de documento
             - estado de la persona en la registraduría
             - fecha de defunción
-            - confirmar si aplica a Póliza Express y su justificación.
+            - confirmar si aplica a Póliza Express y su justificación. 
         """
     ),
     name="supervisor"

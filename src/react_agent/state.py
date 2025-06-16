@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Sequence
+from typing import Sequence, Optional
 
 from langchain_core.messages import AnyMessage
 from langgraph.graph import add_messages
 from langgraph.managed import IsLastStep
 from typing_extensions import Annotated
+from langgraph.prebuilt.chat_agent_executor import AgentState
 
 
 @dataclass
@@ -21,6 +22,12 @@ class InputState:
     messages: Annotated[Sequence[AnyMessage], add_messages] = field(
         default_factory=list
     )
+    
+    session_id: Optional[str] = field(default=None)
+    """
+    Session ID for tracking uploaded files and session-specific data.
+    Used to locate uploaded documents in the file manager.
+    """
  
     """
     Messages tracking the primary execution state of the agent.
@@ -59,3 +66,14 @@ class State(InputState):
     # retrieved_documents: List[Document] = field(default_factory=list)
     # extracted_entities: Dict[str, Any] = field(default_factory=dict)
     # api_connections: Dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass
+class ReactAgentState(AgentState):
+    """Estado compatible con create_react_agent que incluye session_id."""
+    
+    session_id: Optional[str] = field(default=None)
+    """
+    Session ID for tracking uploaded files and session-specific data.
+    Used to locate uploaded documents in the file manager.
+    """

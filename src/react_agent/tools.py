@@ -65,9 +65,21 @@ async def cedula_tool(state: Annotated[State, InjectedState]) -> str:
     import base64
     from PIL import Image
     import io
+    from react_agent.file_manager import file_manager
 
     def process_pdf():
-        pdf_document = fitz.open(f"/home/jssaa/proyectos/react-agent/src/doc_pruebas/Cedula_seb.pdf")
+        # Intentar obtener archivo de la sesión
+        session_id = getattr(state, 'session_id', None)
+        cedula_path = None
+        
+        if session_id:
+            cedula_path = file_manager.get_file_path(session_id, "cedula")
+        
+        # Fallback a archivo por defecto si no hay sesión o archivo
+        if not cedula_path:
+            cedula_path = "/home/jssaa/proyectos/react-agent/src/doc_pruebas/Cedula_seb.pdf"
+        
+        pdf_document = fitz.open(cedula_path)
         page = pdf_document[0]
         pix = page.get_pixmap()
         img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
@@ -148,14 +160,26 @@ async def registraduria_tool() -> str:
 
 
 @tool("fecha_defuncion_tool", description="Una función que retorna la fecha de defunción.")
-async def fecha_defuncion_tool() -> str:
+async def fecha_defuncion_tool(state: Annotated[State, InjectedState]) -> str:
     import fitz  # PyMuPDF
     import base64
     from PIL import Image
     import io
+    from react_agent.file_manager import file_manager
 
     def process_pdf():
-        pdf_document = fitz.open("/home/jssaa/proyectos/react-agent/src/doc_pruebas/CER_DEFUNCION.pdf")
+        # Intentar obtener archivo de la sesión
+        session_id = getattr(state, 'session_id', None)
+        defuncion_path = None
+        
+        if session_id:
+            defuncion_path = file_manager.get_file_path(session_id, "defuncion")
+        
+        # Fallback a archivo por defecto si no hay sesión o archivo
+        if not defuncion_path:
+            defuncion_path = "/home/jssaa/proyectos/react-agent/src/doc_pruebas/CER_DEFUNCION.pdf"
+        
+        pdf_document = fitz.open(defuncion_path)
         page = pdf_document[0]
         pix = page.get_pixmap()
         img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
@@ -299,21 +323,27 @@ def create_handoff_tool(agent_name: str):
         state: Annotated[State, InjectedState],
         tool_call_id: Annotated[str, InjectedToolCallId]
     ) -> Command:
+        from langchain_core.messages import ToolMessage
 
-        tool_msg = {
-            "role": "tool",
-            "content": f"Transferido a {agent_name}",
-            "name": f"transfer_to_{agent_name}",
-            "tool_call_id": tool_call_id,
-        }
+        # El goto debe ir al nombre completo del agente con _agent
+        target_agent = f"{agent_name}_agent"
+        
+        tool_msg = ToolMessage(
+            content=f"Transferido a {target_agent}",
+            name=f"transfer_to_{agent_name}",
+            tool_call_id=tool_call_id,
+        )
         return Command(
-            goto=agent_name,
-            update={"messages": state.messages + [tool_msg]   },
+            goto=target_agent,
+            update={
+                "messages": state.messages + [tool_msg],
+                "session_id": getattr(state, 'session_id', None)  # Preservar session_id
+            },
             graph=Command.PARENT
         )
     return handoff
 
-transfer_to_cedula = create_handoff_tool("cedula_agent")
-transfer_to_registraduria = create_handoff_tool("registraduria_agent")
-transfer_to_defuncion = create_handoff_tool("defuncion_agent")
-transfer_to_saldo = create_handoff_tool("saldo_agent")
+transfer_to_cedula = create_handoff_tool("cedula")
+transfer_to_registraduria = create_handoff_tool("registraduria")
+transfer_to_defuncion = create_handoff_tool("defuncion")
+transfer_to_saldo = create_handoff_tool("saldo")
