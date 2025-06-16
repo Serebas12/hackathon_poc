@@ -21,8 +21,7 @@ class InputState:
     messages: Annotated[Sequence[AnyMessage], add_messages] = field(
         default_factory=list
     )
-    Doc1: str = field(default="Cedula_seb")
-
+ 
     """
     Messages tracking the primary execution state of the agent.
 

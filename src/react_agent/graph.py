@@ -13,7 +13,7 @@ from langgraph.prebuilt import ToolNode
 from react_agent.configuration import Configuration
 from react_agent.state import  State, InputState
 from react_agent.utils import load_chat_model
-from react_agent.nodes import supervisor_agent, cedula_agent, registraduria_agent, defuncion_agent
+from react_agent.nodes import supervisor_agent, cedula_agent, registraduria_agent, defuncion_agent, saldo_agent
 
 
 builder = StateGraph(State, input=InputState)
@@ -24,13 +24,11 @@ builder.add_node("supervisor", supervisor_agent)
 builder.add_node("cedula_agent", cedula_agent)
 builder.add_node("registraduria_agent", registraduria_agent)
 builder.add_node("defuncion_agent", defuncion_agent)
+builder.add_node("saldo_agent", saldo_agent)
 
 def supervisor_routing(state: State) -> str:
     """Determina a qué agente transferir según el tool_call del supervisor."""
     # Protección: verificar que existan mensajes
-    print(f"[DEBUG] Estado recibido en supervisor_routing: {state}")
-    print(f"[DEBUG] Doc1 en supervisor_routing: '{getattr(state, 'Doc1', None)}'")
-
 
     if not state.messages:
         return "__end__"
@@ -49,6 +47,8 @@ def supervisor_routing(state: State) -> str:
         return "registraduria_agent"
     elif tool_name == "transfer_to_defuncion":
         return "defuncion_agent"
+    elif tool_name == "transfer_to_saldo":
+        return "saldo_agent"
     else:
         return "__end__"
 
@@ -58,6 +58,7 @@ builder.add_conditional_edges("supervisor", supervisor_routing)
 builder.add_edge("cedula_agent", "supervisor")
 builder.add_edge("registraduria_agent", "supervisor")
 builder.add_edge("defuncion_agent", "supervisor")
+builder.add_edge("saldo_agent", "supervisor")
 
 # Compile the graph
 graph = builder.compile()

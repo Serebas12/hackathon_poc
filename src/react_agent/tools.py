@@ -66,14 +66,8 @@ async def cedula_tool(state: Annotated[State, InjectedState]) -> str:
     from PIL import Image
     import io
 
-    documento = state.Doc1
-
-    print(f"[DEBUG] Estado recibido en cedula_tool: {state}")
-    print(f"[DEBUG] Doc1 en cedula_tool: '{getattr(state, 'Doc1', None)}'")
-   
-
     def process_pdf():
-        pdf_document = fitz.open(f"/home/jssaa/proyectos/react-agent/src/doc_pruebas/{documento}.pdf")
+        pdf_document = fitz.open(f"/home/jssaa/proyectos/react-agent/src/doc_pruebas/Cedula_seb.pdf")
         page = pdf_document[0]
         pix = page.get_pixmap()
         img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
@@ -226,6 +220,78 @@ async def fecha_defuncion_tool() -> str:
         return response.content
     return str(f"La fecha de defunción es: {response}")
 
+@tool("saldo_tool", description="Una función que consulta un producto del usuario, su saldo, fecha de desembolso y monto de desembolso.")
+async def saldo_tool(cedula: str) -> str:
+    """
+    Una función que consulta el saldo de una persona usando su número de cédula.
+    
+    Args:
+        cedula: El número de cédula de la persona
+    
+    Returns:
+        str: Retorna el saldo, fecha y monto de desembolso, y nombre del producto
+    """
+    import pandas as pd
+    import os
+    from datetime import datetime
+    
+    def process_csv():
+        """Función interna para procesar el CSV de forma síncrona"""
+        # Ruta al archivo CSV
+        csv_path = "/home/jssaa/proyectos/react-agent/src/doc_pruebas/data_saldos.csv"
+        
+        # Verificar si el archivo existe
+        if not os.path.exists(csv_path):
+            raise FileNotFoundError("No se pudo encontrar el archivo de datos de saldos")
+        
+        # Leer el archivo CSV
+        df = pd.read_csv(csv_path)
+        
+        # Filtrar por número de cédula
+        person_data = df[df['Cedula'].astype(str) == str(cedula)]
+        
+        if person_data.empty:
+            raise ValueError(f"No se encontró información para la cédula {cedula}")
+        
+        # Obtener los datos de la primera fila (asumiendo una cédula por persona)
+        row = person_data.iloc[0]
+        
+        saldo = row['Saldo']
+        producto = row['Producto']
+        fecha_desembolso = row['fecha desembolso']
+        monto_desembolso = row['Mondo desembolso']  # Note: hay un typo en el CSV original
+        
+        return saldo, producto, fecha_desembolso, monto_desembolso
+    
+    try:
+        # Ejecutar la operación bloqueante en un hilo separado
+        saldo, producto, fecha_desembolso, monto_desembolso = await asyncio.to_thread(process_csv)
+        
+        # Formatear la fecha si es necesario (convertir de DD/MM/YYYY a formato legible)
+        try:
+            fecha_obj = datetime.strptime(fecha_desembolso, '%d/%m/%Y')
+            fecha_formateada = fecha_obj.strftime('%d de %B de %Y')
+            # Convertir mes en inglés a español
+            meses = {
+                'January': 'enero', 'February': 'febrero', 'March': 'marzo',
+                'April': 'abril', 'May': 'mayo', 'June': 'junio',
+                'July': 'julio', 'August': 'agosto', 'September': 'septiembre',
+                'October': 'octubre', 'November': 'noviembre', 'December': 'diciembre'
+            }
+            for ing, esp in meses.items():
+                fecha_formateada = fecha_formateada.replace(ing, esp)
+        except:
+            fecha_formateada = fecha_desembolso  # Si no se puede formatear, usar original
+        
+        return f"el saldo de la persona es {saldo}, fecha de desembolso {fecha_formateada}, monto de desembolso {monto_desembolso} y nombre del producto {producto}"
+        
+    except FileNotFoundError as e:
+        return f"Error: {str(e)}"
+    except ValueError as e:
+        return str(e)
+    except Exception as e:
+        return f"Error al consultar la información: {str(e)}"
+
 
 def create_handoff_tool(agent_name: str):
     @tool(f"transfer_to_{agent_name}", description=f"Transferir al agente {agent_name}")
@@ -233,9 +299,6 @@ def create_handoff_tool(agent_name: str):
         state: Annotated[State, InjectedState],
         tool_call_id: Annotated[str, InjectedToolCallId]
     ) -> Command:
-
-        print(f"[DEBUG] Estado recibido en transfer_to_{agent_name}: {state}")
-        print(f"[DEBUG] Doc1 en transfer_to_{agent_name}: '{getattr(state, 'Doc1', None)}'")
 
         tool_msg = {
             "role": "tool",
@@ -245,7 +308,7 @@ def create_handoff_tool(agent_name: str):
         }
         return Command(
             goto=agent_name,
-            update={"messages": state.messages + [tool_msg] , "Doc1": state.Doc1  },
+            update={"messages": state.messages + [tool_msg]   },
             graph=Command.PARENT
         )
     return handoff
@@ -253,3 +316,4 @@ def create_handoff_tool(agent_name: str):
 transfer_to_cedula = create_handoff_tool("cedula_agent")
 transfer_to_registraduria = create_handoff_tool("registraduria_agent")
 transfer_to_defuncion = create_handoff_tool("defuncion_agent")
+transfer_to_saldo = create_handoff_tool("saldo_agent")
