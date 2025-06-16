@@ -138,6 +138,12 @@ supervisor_agent = create_react_agent(
         🔁 Repite siempre este flujo, sin desviarte ni invertir el orden de ejecución.
 
         Tu rol no es dialogar ni decidir: es coordinar a los agentes y ejecutar cada paso secuencialmente.
+
+        solamente en el paso final, debes responder con la siguiente información:
+            - numero de documento
+            - estado de la persona en la registraduría
+            - fecha de defunción
+            - confirmar si aplica a Póliza Express y su justificación.
         """
     ),
     name="supervisor"
