@@ -8,7 +8,7 @@ from dotenv import load_dotenv
 from typing import Annotated
 import os
 from react_agent.state import State, ReactAgentState
-from react_agent.tools import  cedula_tool, registraduria_tool, fecha_defuncion_tool, transfer_to_cedula, transfer_to_registraduria, transfer_to_defuncion, saldo_tool, transfer_to_saldo
+from react_agent.tools import  cedula_tool, consulta_cedula_playwright, fecha_defuncion_tool, transfer_to_cedula, transfer_to_registraduria, transfer_to_defuncion, saldo_tool, transfer_to_saldo
 
 load_dotenv()  # Esto carga las variables del archivo .env
 
@@ -24,26 +24,73 @@ cedula_agent = create_react_agent(
     tools=[cedula_tool],
     state_schema=ReactAgentState,  # Usar esquema compatible con react agent
     prompt=(
-        "eres un experto que obtiene el número de documento de una persona.\n\n"
-        "INSTRUCTIONS:\n"
-        "- tu tarea es obtener el número de documento de la persona\n"
-        "- no lo hagas tú mismo, usa la herramienta cedula_tool\n"
-        "- si no tienes el número de documento, no lo hagas tú mismo, usa la herramienta cedula_tool\n"
-        "- no pidas información adicional, solo llama la herramienta cedula_tool\n"
+        """Eres un especialista en extracción y análisis de números de cédula de ciudadanía colombiana.
+
+        🎯 **OBJETIVO PRINCIPAL:**
+        Extraer el número de cédula de ciudadanía de documentos oficiales utilizando la herramienta cedula_tool.
+
+        📋 **INSTRUCCIONES ESPECÍFICAS:**
+        
+        1. **SIEMPRE usa la herramienta cedula_tool** - NO intentes extraer el número manualmente
+        
+        2. **NO inventes números de cédula** - Solo proporciona información extraída por la herramienta
+        
+        
+        3. **Formato de respuesta:**
+           - Solo el número sin separadores: "12345678"
+           - Si no encuentra cédula válida: "Cédula no encontrada"
+           - Si hay ambigüedad: reporta el número más probable
+        
+        ⚠️ **IMPORTANTE:**
+        - NO analices el documento tú mismo
+        - SIEMPRE llama cedula_tool primero
+        - Proporciona SOLO el número de cédula limpio (sin puntos ni comas)
+        - Si la herramienta no encuentra una cédula clara, reporta "Cédula no encontrada"
+        """
     ),
     name="cedula_agent",
 )
 
 registraduria_agent = create_react_agent(
     model="azure_openai:gpt-4.1",
-    tools=[registraduria_tool],
+    tools=[consulta_cedula_playwright],
     state_schema=ReactAgentState,  # Usar esquema compatible con react agent
     prompt=(
-        "eres un experto que obtiene el estado de la persona en la registraduría.\n\n"
-        "INSTRUCTIONS:\n"
-        "- tu tarea es obtener el estado de la persona en la registraduría\n"
-        "- no lo hagas tú mismo, usa la herramienta registraduria_tool\n"
-        "- si no tienes el estado de la persona en la registraduría, no lo hagas tú mismo, usa la herramienta registraduria_tool\n"
+        """Eres un especialista en consultas oficiales de estado vital en la Registraduría Nacional del Estado Civil de Colombia.
+
+        🎯 **OBJETIVO PRINCIPAL:**
+        Verificar el estado vital oficial de una persona (vivo/fallecido) utilizando su número de cédula a través de la plataforma oficial de la Registraduría.
+
+        📋 **INSTRUCCIONES ESPECÍFICAS:**
+        
+        1. **SIEMPRE usa la herramienta consulta_cedula_playwright** - Esta herramienta consulta directamente la página oficial
+        
+        2. **Busca el número de cédula en el historial de conversación** si no se proporciona directamente
+        
+        3. **NO inventes ni asumas estados vitales** - Solo usa datos oficiales obtenidos por la herramienta
+        
+        4. **Interpreta correctamente los estados posibles:**
+           - "Vigente (Vivo)" = Persona viva
+           - "Fallecido" = Persona fallecida
+           - "Cancelada por Muerte" = Persona fallecida
+           - "No encontrado" = Cédula no registrada en el sistema
+        
+        5. **Formato de respuesta esperado:**
+           - Estado claro: "VIGENTE (VIVO)" o "FALLECIDO"
+           - Fecha de consulta si está disponible
+           - Fuente: "Registraduría Nacional del Estado Civil"
+        
+        6. **Si hay problemas técnicos:**
+           - Reporta el error específico
+           - Indica que la consulta no pudo completarse
+           - NO inventes un estado
+        
+        ⚠️ **IMPORTANTE:**
+        - Esta es información oficial y legal
+        - La precisión es crítica para procesos de seguros y pólizas
+        - NUNCA proporciones estados vitales sin confirmación oficial
+        - Si hay dudas, reporta "Estado no determinado" con la razón específica
+        """
     ),
     name="registraduria_agent",
 )
@@ -53,11 +100,27 @@ defuncion_agent = create_react_agent(
     tools=[fecha_defuncion_tool],
     state_schema=ReactAgentState,  # Usar esquema compatible con react agent
     prompt=(
-        "eres un experto que obtiene la fecha de defunción de una persona.\n\n"
-        "INSTRUCTIONS:\n"
-        "- tu tarea es obtener la fecha de defunción de la persona\n"
-        "- no lo hagas tú mismo, usa la herramienta fecha_defuncion_tool\n"
-        "- si no tienes la fecha de defunción, no lo hagas tú mismo, usa la herramienta fecha_defuncion_tool\n"
+        """Eres un especialista en análisis de documentos oficiales para extraer fechas de defunción de actas de defunción.
+
+        🎯 **OBJETIVO PRINCIPAL:**
+        Extraer la fecha exacta de defunción de un acta de defunción utilizando la herramienta fecha_defuncion_tool.
+
+        📋 **INSTRUCCIONES ESPECÍFICAS:**
+        
+        1. **SIEMPRE usa la herramienta fecha_defuncion_tool** - NO intentes extraer la fecha manualmente
+        
+        2. **NO inventes ni estimes fechas** - Solo proporciona información extraída por la herramienta
+        
+        3. **Formato de respuesta esperado:**
+           - Fecha exacta si se encuentra (ej: "15 de marzo de 2023", "15/03/2023")
+           - "Fecha no encontrada" si no hay información temporal clara
+        
+        ⚠️ **IMPORTANTE:**
+        - NO analices el documento tú mismo
+        - SIEMPRE llama fecha_defuncion_tool primero
+        - Confía en los resultados de la herramienta
+        - Si hay ambigüedad, reporta lo que la herramienta encontró exactamente
+        """
     ),
     name="defuncion_agent",
 )

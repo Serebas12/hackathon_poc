@@ -137,16 +137,149 @@ async def cedula_tool(state: Annotated[State, InjectedState]) -> str:
     return str(f"El número de cédula es: {response}")
 
 
-@tool("registraduria_tool", description="Una función que consulta el estado de una persona en la registraduría.")
-async def registraduria_tool() -> str:
+@tool("consulta_cedula_playwright", description="Consulta el estado vital de una persona en la Registraduría Nacional usando su número de cédula.")
+async def consulta_cedula_playwright(cedula: str) -> str:
     """
-    Una función que consulta el estado de una persona en la registraduría.
+    Consulta el estado vital de una persona en la página de defunciones de la Registraduría Nacional.
     
+    Args:
+        cedula: Número de cédula de ciudadanía a consultar (máximo 10 dígitos)
+        
     Returns:
-        str: Retorna el estado de la persona
+        str: Resultado de la consulta con el estado de la cédula (Vigente/Vivo o Fallecido)
     """
-    return "fallecido"
+    import asyncio
+    from playwright.async_api import async_playwright
+    import os
+    from datetime import datetime
+    
+    async def run_playwright_consultation():
+        async with async_playwright() as p:
+            try:
+                # Crear enlace simbólico si no existe (para WSL/Linux)
+                firefox_cache_dir = os.path.expanduser("~/.cache/ms-playwright")
+                firefox_1482_path = os.path.join(firefox_cache_dir, "firefox-1482")
+                firefox_1487_path = os.path.join(firefox_cache_dir, "firefox-1487")
+                
+                if not os.path.exists(firefox_1482_path) and os.path.exists(firefox_1487_path):
+                    os.symlink(firefox_1487_path, firefox_1482_path)
+                
+                # Lanzar navegador
+                browser = await p.firefox.launch(headless=True)
+                context = await browser.new_context()
+                page = await context.new_page()
+                
+                # Navegar a la página de defunciones
+                await page.goto("https://defunciones.registraduria.gov.co/", timeout=30000)
+                await page.wait_for_load_state("networkidle")
+                
+                # Esperar a que aparezca el campo de cédula
+                await page.wait_for_selector("#nuip", timeout=10000)
+                
+                # Limpiar y llenar el campo de cédula
+                await page.fill("#nuip", "")
+                await page.fill("#nuip", str(cedula))
+                
+                # Hacer clic en el botón buscar
+                await page.click("button.btn.btn-primary")
+                
+                # Esperar a que aparezca el resultado (puede ser exitoso o de error)
+                try:
+                    await page.wait_for_timeout(3000)  # Esperar 3 segundos para que cargue
+                    
+                    # Obtener todo el texto visible de la página
+                    page_text = await page.inner_text("body")
+                    
+                                         # Verificar si hay un resultado válido
+                    if "se encuentra en el archivo nacional" in page_text:
+                        # Extraer información específica
+                        if "Vigente (Vivo)" in page_text:
+                            estado = "Vigente (Vivo)"
+                        elif ("Fallecido" in page_text or 
+                              "fallecid" in page_text.lower() or 
+                              "Cancelada por Muerte" in page_text or
+                              "cancelada por muerte" in page_text.lower()):
+                            estado = "Fallecido"
+                        else:
+                            estado = "Estado no determinado"
+                        
+                        # Extraer fecha de consulta si está disponible
+                        fecha_consulta = datetime.now().strftime("%d/%m/%Y")
+                        if "Fecha Consulta:" in page_text:
+                            lines = page_text.split('\n')
+                            for line in lines:
+                                if "Fecha Consulta:" in line:
+                                    fecha_consulta = line.replace("Fecha Consulta:", "").strip()
+                                    break
+                        
+                        result = f"""
+Consulta de Cédula Exitosa
+========================
+Número de documento: {cedula}
+Estado: {estado}
+Fecha de consulta: {fecha_consulta}
+Fuente: Registraduría Nacional del Estado Civil
 
+La cédula {cedula} se encuentra en el archivo nacional de identificación con estado: {estado}
+"""
+                    
+                    elif ("Cancelada por Muerte" in page_text or 
+                          "cancelada por muerte" in page_text.lower()):
+                        # Caso especial: Cédula cancelada por muerte
+                        fecha_consulta = datetime.now().strftime("%d/%m/%Y")
+                        if "Fecha Consulta:" in page_text:
+                            lines = page_text.split('\n')
+                            for line in lines:
+                                if "Fecha Consulta:" in line:
+                                    fecha_consulta = line.replace("Fecha Consulta:", "").strip()
+                                    break
+                        
+                        result = f"""
+Consulta de Cédula Exitosa
+========================
+Número de documento: {cedula}
+Estado: Fallecido
+Motivo: Cancelada por Muerte
+Fecha de consulta: {fecha_consulta}
+Fuente: Registraduría Nacional del Estado Civil
+
+La cédula {cedula} está cancelada por muerte, por lo tanto el estado es: Fallecido
+"""
+                    
+                    elif "no se encuentra" in page_text.lower() or "no existe" in page_text.lower():
+                        result = f"""
+Consulta de Cédula - No Encontrada
+=================================
+Número de documento: {cedula}
+Estado: No encontrado en el archivo nacional
+Fecha de consulta: {datetime.now().strftime("%d/%m/%Y")}
+
+La cédula {cedula} no se encuentra registrada en el archivo nacional de identificación.
+"""
+                    
+                    else:
+                        result = f"""
+Consulta de Cédula - Resultado Incierto
+======================================
+Número de documento: {cedula}
+Fecha de consulta: {datetime.now().strftime("%d/%m/%Y")}
+
+No se pudo determinar el estado de la cédula. Respuesta del sistema:
+{page_text[:500]}...
+"""
+                
+                except Exception as e:
+                    result = f"Error durante la consulta de la cédula {cedula}: {str(e)}"
+                
+                await browser.close()
+                return result
+                
+            except Exception as e:
+                if 'browser' in locals():
+                    await browser.close()
+                return f"Error al consultar la cédula {cedula}: {str(e)}"
+    
+    return await run_playwright_consultation()
 
 # @tool("fecha_defuncion_tool", description="Una función que retorna la fecha de defunción.")
 # async def fecha_defuncion_tool() -> str:
