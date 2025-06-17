@@ -8,7 +8,7 @@ from dotenv import load_dotenv
 from typing import Annotated
 import os
 from react_agent.state import State, ReactAgentState
-from react_agent.tools import  cedula_tool, registraduria_tool, fecha_defuncion_tool, transfer_to_cedula, transfer_to_registraduria, transfer_to_defuncion, saldo_tool, transfer_to_saldo
+from react_agent.tools import  cedula_tool, registraduria_tool, consulta_cedula_playwright, fecha_defuncion_tool, transfer_to_cedula, transfer_to_registraduria, transfer_to_defuncion, saldo_tool, transfer_to_saldo
 
 load_dotenv()  # Esto carga las variables del archivo .env
 
@@ -36,14 +36,17 @@ cedula_agent = create_react_agent(
 
 registraduria_agent = create_react_agent(
     model="azure_openai:gpt-4.1",
-    tools=[registraduria_tool],
+    tools=[consulta_cedula_playwright],
     state_schema=ReactAgentState,  # Usar esquema compatible con react agent
     prompt=(
-        "eres un experto que obtiene el estado de la persona en la registraduría.\n\n"
-        "INSTRUCTIONS:\n"
-        "- tu tarea es obtener el estado de la persona en la registraduría\n"
-        "- no lo hagas tú mismo, usa la herramienta registraduria_tool\n"
-        "- si no tienes el estado de la persona en la registraduría, no lo hagas tú mismo, usa la herramienta registraduria_tool\n"
+        "Eres un experto que consulta el estado vital de una persona en la Registraduría Nacional del Estado Civil.\n\n"
+        "INSTRUCCIONES:\n"
+        "- Tu tarea es verificar el estado de la persona (vivo/fallecido) usando el número de cédula\n"
+        "- SIEMPRE usa la herramienta consulta_cedula_playwright con el número de cédula como parámetro\n"
+        "- NO inventes información, solo usa los datos que obtienes de la herramienta\n"
+        "- Si no tienes el número de cédula, solicita que se proporcione primero\n"
+        "- La herramienta te dará información oficial de la Registraduría Nacional\n"
+        "- Proporciona un resumen claro del estado encontrado (Vigente/Vivo, Fallecido, o No encontrado)\n"
     ),
     name="registraduria_agent",
 )
@@ -126,30 +129,13 @@ saldo_agent = create_react_agent(
 
 supervisor_agent = create_react_agent(
     model="azure_openai:gpt-4.1",
-    tools=[transfer_to_cedula, transfer_to_registraduria, transfer_to_defuncion, transfer_to_saldo],
+    tools=[transfer_to_cedula, transfer_to_registraduria],
     state_schema=ReactAgentState,  # Usar esquema compatible con react agent
     prompt=(
         """Eres un supervisor que coordina tres agentes especializados. Tu tarea es siempre ejecutar, en este orden y sin excepciones, las siguientes acciones:
 
         1. Obtener el número de documento del usuario usando la herramienta `cedula_tool`.
-        2. Verificar el estado de la persona en la registraduría usando `registraduria_agent`.
-        3. Obtener la fecha de defunción usando `defuncion_agent`.
-        4. Obtener el saldo de la persona usando `saldo_agent`.
-
-        ⚠️ Instrucciones clave (obligatorias):
-        - Siempre debes iniciar ejecutando la herramienta `cedula_tool`. No preguntes, no confirmes, no hagas razonamientos antes de usarla.
-        - No pidas ninguna información adicional al usuario. Toda la información requerida se obtiene únicamente con las herramientas.
-        - Está prohibido iniciar una conversación o solicitar datos al usuario en este paso. Usa directamente `cedula_tool`.
-
-        🔁 Repite siempre este flujo, sin desviarte ni invertir el orden de ejecución.
-
-        Tu rol no es dialogar ni decidir: es coordinar a los agentes y ejecutar cada paso secuencialmente.
-
-        solamente en el paso final, debes responder con la siguiente información:
-            - numero de documento
-            - estado de la persona en la registraduría
-            - fecha de defunción
-            - confirmar si aplica a Póliza Express y su justificación. 
+        2. Verificar el estado de la persona en la registraduría usando `registraduria_agent`, debes llamar la herramienta compartiendo el número de documento con el que se extrajo previamente.
         """
     ),
     name="supervisor"
